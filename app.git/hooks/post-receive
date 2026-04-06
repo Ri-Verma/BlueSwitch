@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# --- EXIT ON ERROR ---
+# This is a crucial Bash safety net. If any command fails, 
+# the script immediately stops instead of blindly continuing.
+set -e 
+
+TARGET="/home/hiori/Desktop/WorkStation/MVP/PaaS_System/deployed-app"
+REPO="/home/hiori/Desktop/WorkStation/MVP/PaaS_System/app.git"
+APP_NAME="$(basename "$REPO" .git)"
+PROXY_CONF="/home/hiori/Desktop/WorkStation/MVP/PaaS_System/proxy/conf.d"
+
+DEPLOY_TAG=$(date +%s)
+NEW_CONTAINER="${APP_NAME}-${DEPLOY_TAG}"
+
+echo "---  Zero-Downtime Deployment Started ---"
+
+mkdir -p $TARGET
+git --work-tree=$TARGET --git-dir=$REPO checkout -f
+cd $TARGET
+
+# 1. THE BUILD BREAKER: We catch build errors explicitly
+echo "--- 📦 Building new image... ---"
+if ! docker build -t ${APP_NAME}:${DEPLOY_TAG} .; then
+    echo " FATAL ERROR: Docker build failed!"
+    echo "Deployment aborted. Your old container is still running safely."
+    exit 1
+fi
+
+# 2. CONTAINER SELF-HEALING: We add '--restart unless-stopped'
+# If your app crashes due to a memory leak at 3 AM, Docker will automatically restart it.
+echo "--- 🏃 Starting new container ($NEW_CONTAINER)... ---"
+if ! docker run -d --restart unless-stopped --name $NEW_CONTAINER --network paas-network --env-file $TARGET/.env ${APP_NAME}:${DEPLOY_TAG}; then
+    echo " FATAL ERROR: Container failed to start!"
+    echo "Deployment aborted."
+    exit 1
+fi
+
+# Wait to ensure the container doesn't immediately crash after booting
+sleep 3
+
+# 3. HEALTH CHECK: Verify the container is actually 'running' and hasn't 'exited'
+CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' $NEW_CONTAINER)
+if [ "$CONTAINER_STATUS" != "running" ]; then
+    echo " FATAL ERROR: Container started but immediately crashed!"
+    echo "Cleaning up broken container..."
+    docker rm -f $NEW_CONTAINER
+    echo "Deployment aborted. Traffic was NOT switched."
+    exit 1
+fi
+
+# Switch the Traffic (Only happens if all the health checks above pass)
+echo "--- 🔀 Health checks passed. Switching traffic... ---"
+cat <<EOF > $PROXY_CONF/$APP_NAME.conf
+server {
+    listen 80;
+    server_name $APP_NAME.local;
+
+    location / {
+        proxy_pass http://$NEW_CONTAINER:80;
+    }
+}
+EOF
+
+docker exec paas-proxy nginx -s reload
+
+echo "--- 🧹 Cleaning up old containers... ---"
+OLD_CONTAINERS=$(docker ps -a --format "{{.Names}}" | grep "^${APP_NAME}-" | grep -v "^${NEW_CONTAINER}$")
+
+for container in $OLD_CONTAINERS; do
+    docker stop $container || true
+    docker rm $container || true
+done
+
+echo "--- ✅ Deployment Complete! Zero Downtime Achieved. ---"

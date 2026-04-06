@@ -1,0 +1,29 @@
+# OS & IDE Files
+.DS_Store
+.vscode/
+__pycache__/
+*.pyc
+
+# Python Virtual Environment
+venv/
+env/
+
+# Secrets & Environment Variables
+.env
+deployed-app/.env
+
+# ---------------------------------------------------
+# MINI-PAAS DYNAMIC DIRECTORIES (Do not track these!)
+# ---------------------------------------------------
+# Ignore the bare git repo because it holds the user's pushed code
+app.git/*
+!app.git/hooks/
+!app.git/hooks/post-receive
+
+# Ignore the actual extracted application code (this changes every push)
+deployed-app/*
+!deployed-app/.gitkeep
+
+# Ignore dynamically generated Nginx routing files
+proxy/conf.d/*.conf
+proxy/config.d/
