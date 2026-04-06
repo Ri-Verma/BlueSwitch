@@ -5,10 +5,10 @@
 # the script immediately stops instead of blindly continuing.
 set -e 
 
-TARGET="/home/hiori/Desktop/WorkStation/MVP/PaaS_System/deployed-app"
-REPO="/home/hiori/Desktop/WorkStation/MVP/PaaS_System/app.git"
+TARGET="/your-project/deployed-app"
+REPO="/your-projectapp.git"
 APP_NAME="$(basename "$REPO" .git)"
-PROXY_CONF="/home/hiori/Desktop/WorkStation/MVP/PaaS_System/proxy/conf.d"
+PROXY_CONF="/your-project/conf.d"
 
 DEPLOY_TAG=$(date +%s)
 NEW_CONTAINER="${APP_NAME}-${DEPLOY_TAG}"
@@ -19,7 +19,7 @@ mkdir -p $TARGET
 git --work-tree=$TARGET --git-dir=$REPO checkout -f
 cd $TARGET
 
-# 1. THE BUILD BREAKER: We catch build errors explicitly
+# THE BUILD BREAKER: We catch build errors explicitly
 echo "--- 📦 Building new image... ---"
 if ! docker build -t ${APP_NAME}:${DEPLOY_TAG} .; then
     echo " FATAL ERROR: Docker build failed!"
@@ -27,7 +27,7 @@ if ! docker build -t ${APP_NAME}:${DEPLOY_TAG} .; then
     exit 1
 fi
 
-# 2. CONTAINER SELF-HEALING: We add '--restart unless-stopped'
+# CONTAINER SELF-HEALING: We add '--restart unless-stopped'
 # If your app crashes due to a memory leak at 3 AM, Docker will automatically restart it.
 echo "--- 🏃 Starting new container ($NEW_CONTAINER)... ---"
 if ! docker run -d --restart unless-stopped --name $NEW_CONTAINER --network paas-network --env-file $TARGET/.env ${APP_NAME}:${DEPLOY_TAG}; then
@@ -39,7 +39,7 @@ fi
 # Wait to ensure the container doesn't immediately crash after booting
 sleep 3
 
-# 3. HEALTH CHECK: Verify the container is actually 'running' and hasn't 'exited'
+#  HEALTH CHECK: Verify the container is actually 'running' and hasn't 'exited'
 CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' $NEW_CONTAINER)
 if [ "$CONTAINER_STATUS" != "running" ]; then
     echo " FATAL ERROR: Container started but immediately crashed!"
