@@ -15,11 +15,11 @@ A lightweight, localized Platform as a Service (PaaS) built from scratch using P
 
 ## Architecture & Directory Structure
 
-The workspace is strictly decoupled into the Platform (`PaaS_System`) and the Client Application (`weee`).
+The workspace is strictly decoupled into the Platform (`BlueSwitch`) and the Client Application (`demo-website`).
 
 ```text
-MVP/
-├── PaaS_System/            # The Platform Infrastructure
+Home/
+├── BLueSwitch/            # The Platform Infrastructure
 │   ├── main.py             # FastAPI Control Plane Server
 │   ├── dashboard/          # Frontend UI assets (index.html, js, css)
 │   ├── proxy/              # Nginx configuration and 502 Fallback HTML
@@ -47,7 +47,7 @@ Ensure you have the following installed on your local machine:
 ### Step 1: Initialize the Control Plane
 1. Open your terminal and navigate to the PaaS directory:
    ```bash
-   cd MVP/PaaS_System
+   cd Your-project
    ```
 2. Create and activate a Python virtual environment:
    ```bash
@@ -67,11 +67,11 @@ Ensure you have the following installed on your local machine:
 ### Step 2: Configure the Client Application
 1. Open a new terminal window and navigate to your client application folder:
    ```bash
-   cd MVP/weee
+   cd builds/demo-website
    ```
 2. Add the PaaS as a Git remote destination (make sure to use your absolute path):
    ```bash
-   git remote add local-paas /home/hiori/Desktop/WorkStation/MVP/PaaS_System/app.git
+   git remote add local /absolute/path/your-project/app.git
    ```
 
 ### Step 3: Deploy via Git
@@ -79,9 +79,18 @@ Make a change to your app, commit it, and push to the PaaS server:
 ```bash
 git add .
 git commit -m "Initial Deployment"
-git push local-paas master
+git push local master
 ```
 *Watch the terminal as the Git Hook automatically builds the Docker image, starts the container, and switches the Nginx proxy traffic with zero downtime. Your app will be live at `http://app.local`.*
+
+*By default, the Nginx reverse proxy routes traffic based on the application name, assuming a .local domain. To access http://app.local on your browser, you must map it to your local machine.*
+
+*Add the following line to your operating system's hosts file:
+127.0.0.1 app.local *
+
+*Linux/Mac: Edit /etc/hosts (requires sudo).*
+
+*Windows: Edit C:\Windows\System32\drivers\etc\hosts (requires running Notepad as Administrator).*
 
 ---
 
@@ -90,15 +99,15 @@ git push local-paas master
 A core feature of this platform is the ability to securely manage Environment Variables (Secrets) without hardcoding them into your application's GitHub repository.
 
 ### How to add Secrets via the UI:
-1. Open the Mini-PaaS Control Plane Dashboard (`http://127.0.0.1:8000/ui`).
+1. Open the BlueSwitch Control Plane Dashboard (`http://127.0.0.1:8000/ui`).
 2. Locate your running application card.
 3. Click the "Add Secret" button.
 4. Enter the Variable Name (e.g., `API_KEY`) and its Value.
 
 ### How it works under the hood:
-When you save a secret via the dashboard, the FastAPI backend securely writes it to the `PaaS_System/deployed-app/.env` file. 
+When you save a secret via the dashboard, the FastAPI backend securely writes it to the `BlueSwitch/deployed-app/.env` file. 
 
-During the next deployment (`git push local-paas master`), the `post-receive` bash script automatically injects this `.env` file directly into the Docker container upon startup using the `--env-file` flag:
+During the next deployment (`git push local master`), the `post-receive` bash script automatically injects this `.env` file directly into the Docker container upon startup using the `--env-file` flag:
 
 ```bash
 docker run -d --name $NEW_CONTAINER --network paas-network --env-file $TARGET/.env <image-name>

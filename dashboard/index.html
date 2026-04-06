@@ -1,168 +1,24 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Mini-PaaS Dashboard</title>
-    <style>
-        body { font-family: sans-serif; background: #f4f4f9; padding: 20px; }
-        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 10px; display: flex; justify-content: space-between; }
-        .status-running { color: green; font-weight: bold; }
-        .status-exited { color: red; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini-PaaS | Control Plane</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>🚀 My Mini-PaaS Control Plane</h1>
-    <div id="app-list">Loading apps...</div>
 
-    <script>
-        // ==========================================
-        // 1. DASHBOARD UI & API LOGIC (Flicker-Free)
-        // ==========================================
-        async function fetchApps() {
-            try {
-                const response = await fetch('http://127.0.0.1:8000/api/apps');
-                const apps = await response.json();
-                const container = document.getElementById('app-list');
+    <div class="header">
+        <div class="header-titles">
+            <h1> Control Plane</h1>
+            <div class="subtitle">Mini-PaaS Infrastructure Management</div>
+        </div>
+    </div>
 
-                // Clear the "Loading apps..." text only on the very first successful load
-                if (container.innerText === "Loading apps...") {
-                    container.innerHTML = '';
-                }
+    <div id="app-list" class="grid-container">
+        <p class="loading-text">Establishing connection to Docker Daemon...</p>
+    </div>
 
-                // Keep a list of currently active apps to clean up deleted ones later
-                const activeAppNames = new Set(apps.map(a => a.name));
-
-                for (const app of apps) {
-                    // 1. Fetch Stats
-                    let statsHtml = '';
-                    if (app.status === 'running' && app.name !== 'paas-proxy') {
-                        const statRes = await fetch(`http://127.0.0.1:8000/api/apps/${app.name}/stats`);
-                        const stats = await statRes.json();
-                        if (!stats.error) {
-                            statsHtml = `<small style="color: #666;">📊 RAM: ${stats.usage_mb} MB / ${stats.limit_mb} MB</small>`;
-                        }
-                    }
-
-                    // 2. Build Buttons
-                    let powerBtn = app.status === 'running' 
-                        ? `<button onclick="toggleApp('${app.name}', 'stop')" style="background: #ffbc42; border:none; padding:5px 10px; cursor:pointer;">Pause</button>`
-                        : `<button onclick="toggleApp('${app.name}', 'start')" style="background: #4CAF50; color:white; border:none; padding:5px 10px; cursor:pointer;">Start</button>`;
-
-                    let extraTools = '';
-                    if (app.name !== 'paas-proxy') {
-                        extraTools = `
-                            <button onclick="saveSecret('${app.name}')" style="background: #333; color:white; border:none; padding:5px 10px; cursor:pointer;">🔑 Add Secret</button>
-                            <button onclick="nukeApp('${app.name}')" style="background: #d90429; color:white; border:none; padding:5px 10px; cursor:pointer;">🗑️ Delete</button>
-                        `;
-                    }
-
-                    // 3. Define what goes INSIDE the card
-                    const cardInnerHtml = `
-                        <div>
-                            <strong>${app.name}</strong> <br>
-                            <small>Image: ${app.image}</small><br>
-                            ${statsHtml}
-                        </div>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <span class="${app.status === 'running' ? 'status-running' : 'status-exited'}">
-                                ${app.status.toUpperCase()}
-                            </span>
-                            ${powerBtn}
-                            ${extraTools}
-                        </div>
-                    `;
-
-                    // 4. THE MAGIC: Check if this specific card is already on the screen
-                    let existingCard = document.getElementById(`card-${app.name}`);
-
-                    if (existingCard) {
-                        // UPDATE: It exists! Just replace the text inside so it doesn't flicker
-                        existingCard.innerHTML = cardInnerHtml;
-                        existingCard.style.borderLeft = `5px solid ${app.status === 'running' ? '#4CAF50' : '#d90429'}`;
-                    } else {
-                        // CREATE: It's a brand new app! Build the HTML container from scratch
-                        let newCard = document.createElement('div');
-                        newCard.id = `card-${app.name}`;
-                        newCard.className = "card";
-                        newCard.style.borderLeft = `5px solid ${app.status === 'running' ? '#4CAF50' : '#d90429'}`;
-                        newCard.innerHTML = cardInnerHtml;
-                        container.appendChild(newCard);
-                    }
-                }
-
-                // 5. CLEANUP: If you clicked "Delete" on an app, remove its HTML card from the screen
-                Array.from(container.children).forEach(childElement => {
-                    const appName = childElement.id.replace('card-', '');
-                    if (!activeAppNames.has(appName)) {
-                        childElement.remove();
-                    }
-                });
-
-            } catch (error) {
-                // Silently wait if the API is momentarily down during a deployment swap
-            }
-        }
-
-        async function toggleApp(appName, action) {
-            await fetch(`http://127.0.0.1:8000/api/apps/${appName}/${action}`, { method: 'POST' });
-            fetchApps();
-        }
-
-        async function saveSecret(appName) {
-            const key = prompt("Enter Variable Name (e.g., API_KEY):");
-            const value = prompt("Enter Variable Value:");
-            if (key && value) {
-                const payload = { variables: {} };
-                payload.variables[key] = value;
-                
-                await fetch(`http://127.0.0.1:8000/api/apps/${appName}/env`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                alert("Secret saved! It will be injected on your next git push.");
-            }
-        }
-
-        async function nukeApp(appName) {
-            if(confirm(`DANGER: Are you sure you want to permanently delete ${appName}?`)) {
-                await fetch(`http://127.0.0.1:8000/api/apps/${appName}`, { method: 'DELETE' });
-                fetchApps();
-            }
-        }
-
-        // Update the dashboard UI every 5 seconds
-        setInterval(fetchApps, 5000); 
-        fetchApps();
-
-        // ==========================================
-        // 2. ZERO-DOWNTIME LIVE RELOAD WATCHER
-        // ==========================================
-        (function() {
-            const CONTROL_PLANE_URL = "http://127.0.0.1:8000/api/apps";
-            let currentContainerId = null;
-
-            setInterval(async () => {
-                try {
-                    const response = await fetch(CONTROL_PLANE_URL);
-                    const apps = await response.json();
-                    
-                    const myApp = apps.find(a => 
-                        (a.name.startsWith('app-') || a.name === 'app') && a.name !== 'paas-proxy'
-                    );
-                    
-                    if (myApp && myApp.status === 'running') {
-                        if (!currentContainerId) {
-                            currentContainerId = myApp.id;
-                        } else if (currentContainerId !== myApp.id) {
-                            console.log("🚀 Zero-Downtime swap detected! Reloading page...");
-                            window.location.reload();
-                        }
-                    }
-                } catch (error) {
-                    // Ignore errors during deployment swaps
-                }
-            }, 1500); // Check container IDs aggressively for the live reload
-        })();
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
