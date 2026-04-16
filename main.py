@@ -47,6 +47,11 @@ def ensure_proxy_running():
             
     except docker.errors.NotFound:
         print("Proxy not found. Creating and starting 'paas-proxy'...")
+        # Determine absolute path to the project root dynamically
+        project_root = os.path.abspath(os.path.dirname(__file__))
+        proxy_conf_dir = os.path.join(project_root, 'proxy', 'conf.d')
+        proxy_html_dir = os.path.join(project_root, 'proxy', 'html')
+        
         try:
             client.containers.run(
                 "nginx:alpine",
@@ -55,12 +60,12 @@ def ensure_proxy_running():
                 network="paas-network",
                 ports={'80/tcp': 80},
                 volumes={
-                    '/home/hiori/Desktop/WorkStation/MVP/PaaS_System/proxy/conf.d': {
+                    proxy_conf_dir: {
                         'bind': '/etc/nginx/conf.d',
                         'mode': 'rw' # rw -> read/write
                     },
                     # 🆕 NEW: Mount the HTML folder so Nginx can see your 502 error page
-                    '/home/hiori/Desktop/WorkStation/MVP/PaaS_System/proxy/html': {
+                    proxy_html_dir: {
                         'bind': '/usr/share/nginx/html',
                         'mode': 'ro' # ro -> read-only
                     }
@@ -102,7 +107,8 @@ def get_app_stats(name: str):
 def update_env_vars(name: str, payload: EnvPayload):
     """Saves secure variables to a .env file in the deployment folder."""
     # We save these to the folder where your bash script builds the app
-    env_file_path = "/home/hiori/Desktop/WorkStation/MVP/PaaS_System/deployed-app/.env"
+    project_root = os.path.abspath(os.path.dirname(__file__))
+    env_file_path = os.path.join(project_root, "deployed-app", ".env")
     
     try:
         with open(env_file_path, "w") as f:
@@ -125,7 +131,8 @@ def delete_app(name: str):
         container.remove()
         
         # 2. Delete the Nginx routing configuration
-        conf_path = f"/home/hiori/Desktop/WorkStation/MVP/PaaS_System/proxy/conf.d/{name}.conf"
+        project_root = os.path.abspath(os.path.dirname(__file__))
+        conf_path = os.path.join(project_root, "proxy", "conf.d", f"{name}.conf")
         if os.path.exists(conf_path):
             os.remove(conf_path)
             

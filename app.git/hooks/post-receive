@@ -5,10 +5,20 @@
 # the script immediately stops instead of blindly continuing.
 set -e 
 
-TARGET="/your-project/deployed-app"
-REPO="/your-projectapp.git"
+# Dynamically determine paths based on the script location
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(dirname "$HOOK_DIR")"
+PROJECT_ROOT="$(dirname "$REPO")"
+
+TARGET="$PROJECT_ROOT/deployed-app"
 APP_NAME="$(basename "$REPO" .git)"
-PROXY_CONF="/your-project/conf.d"
+
+# Use proxy/conf.d if it exists, otherwise fallback to conf.d
+if [ -d "$PROJECT_ROOT/proxy/conf.d" ]; then
+    PROXY_CONF="$PROJECT_ROOT/proxy/conf.d"
+else
+    PROXY_CONF="$PROJECT_ROOT/conf.d"
+fi
 
 DEPLOY_TAG=$(date +%s)
 NEW_CONTAINER="${APP_NAME}-${DEPLOY_TAG}"

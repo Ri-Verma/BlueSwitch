@@ -3,7 +3,7 @@
 // ==========================================
 async function fetchApps() {
     try {
-        const response = await fetch('http://127.0.0.1:8000/api/apps');
+        const response = await fetch('/api/apps');
         const apps = await response.json();
         const container = document.getElementById('app-list');
 
@@ -18,7 +18,7 @@ async function fetchApps() {
             // -- Fetch RAM Telemetry --
             let statsHtml = 'Waiting for telemetry...';
             if (app.status === 'running' && app.name !== 'paas-proxy') {
-                const statRes = await fetch(`http://127.0.0.1:8000/api/apps/${app.name}/stats`);
+                const statRes = await fetch(`/api/apps/${app.name}/stats`);
                 const stats = await statRes.json();
                 
                 if (!stats.error) {
@@ -110,7 +110,7 @@ async function fetchApps() {
 // 2. API ACTION LOGIC
 // ==========================================
 async function toggleApp(appName, action) {
-    await fetch(`http://127.0.0.1:8000/api/apps/${appName}/${action}`, { method: 'POST' });
+    await fetch(`/api/apps/${appName}/${action}`, { method: 'POST' });
     fetchApps(); // Immediate refresh for instant UI feedback
 }
 
@@ -122,7 +122,7 @@ async function saveSecret(appName) {
         const payload = { variables: {} };
         payload.variables[key] = value;
         
-        await fetch(`http://127.0.0.1:8000/api/apps/${appName}/env`, {
+        await fetch(`/api/apps/${appName}/env`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -133,7 +133,7 @@ async function saveSecret(appName) {
 
 async function nukeApp(appName) {
     if(confirm(`DANGER: Are you sure you want to permanently delete ${appName} and its routing data?`)) {
-        await fetch(`http://127.0.0.1:8000/api/apps/${appName}`, { method: 'DELETE' });
+        await fetch(`/api/apps/${appName}`, { method: 'DELETE' });
         fetchApps();
     }
 }
@@ -143,10 +143,10 @@ setInterval(fetchApps, 4000);
 fetchApps();
 
 // ==========================================
-// 3. ZERO-DOWNTIME LIVE RELOAD WATCHER
+// 3. LIVE RELOAD WATCHER
 // ==========================================
 (function() {
-    const CONTROL_PLANE_URL = "http://127.0.0.1:8000/api/apps";
+    const CONTROL_PLANE_URL = "/api/apps";
     let currentContainerId = null;
 
     setInterval(async () => {
